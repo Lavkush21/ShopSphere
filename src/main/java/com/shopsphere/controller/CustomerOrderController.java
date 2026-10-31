@@ -1,3 +1,4 @@
+
 package com.shopsphere.controller;
 
 import java.util.List;
@@ -46,6 +47,7 @@ public class CustomerOrderController {
     public CustomerOrder updateOrder(
             @PathVariable Long id,
             @RequestBody CustomerOrder order) {
+
         return orderService.updateOrder(id, order);
     }
 
@@ -57,8 +59,16 @@ public class CustomerOrderController {
         return orderService.updateOrderStatus(id, status);
     }
 
+    // Cancel order and restore product stock
+    @PutMapping("/{id}/cancel")
+    public CustomerOrder cancelOrder(@PathVariable Long id) {
+
+        return orderService.cancelOrder(id);
+    }
+
     @DeleteMapping("/{id}")
     public String deleteOrder(@PathVariable Long id) {
+
         orderService.deleteOrder(id);
         return "Order deleted successfully";
     }
