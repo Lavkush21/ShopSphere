@@ -2,6 +2,9 @@ package com.shopsphere.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.shopsphere.entity.Product;
 
 public interface ProductService {
@@ -15,4 +18,14 @@ public interface ProductService {
     Product updateProduct(Long id, Product product);
 
     void deleteProduct(Long id);
+
+    // Search product by name
+    Page<Product> searchProducts(String name, Pageable pageable);
+
+    // Filter products by category
+    Page<Product> getProductsByCategory(Long categoryId, Pageable pageable);
+
+    // Filter products by price range
+    Page<Product> getProductsByPriceRange(
+            Double minPrice, Double maxPrice, Pageable pageable);
 }

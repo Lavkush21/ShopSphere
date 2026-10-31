@@ -2,6 +2,8 @@ package com.shopsphere.service.impl;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.shopsphere.entity.Product;
@@ -50,5 +52,26 @@ public class ProductServiceImpl implements ProductService {
     public void deleteProduct(Long id) {
         Product product = getProductById(id);
         productRepository.delete(product);
+    }
+
+    @Override
+    public Page<Product> searchProducts(String name, Pageable pageable) {
+        return productRepository.findByNameContainingIgnoreCase(name, pageable);
+    }
+
+    @Override
+    public Page<Product> getProductsByCategory(Long categoryId, Pageable pageable) {
+        return productRepository.findByCategory_Id(categoryId, pageable);
+    }
+
+    @Override
+    public Page<Product> getProductsByPriceRange(
+            Double minPrice, Double maxPrice, Pageable pageable) {
+
+        if (minPrice < 0 || maxPrice < minPrice) {
+            throw new IllegalArgumentException("Invalid price range");
+        }
+
+        return productRepository.findByPriceBetween(minPrice, maxPrice, pageable);
     }
 }

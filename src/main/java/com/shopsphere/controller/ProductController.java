@@ -2,6 +2,8 @@ package com.shopsphere.controller;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -52,5 +54,31 @@ public class ProductController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
+    }
+
+    // Search Products by Name with Pagination
+    @GetMapping("/search")
+    public Page<Product> searchProducts(
+            @RequestParam String name,
+            Pageable pageable) {
+        return productService.searchProducts(name, pageable);
+    }
+
+    // Filter Products by Category
+    @GetMapping("/category/{categoryId}")
+    public Page<Product> getProductsByCategory(
+            @PathVariable Long categoryId,
+            Pageable pageable) {
+        return productService.getProductsByCategory(categoryId, pageable);
+    }
+
+    // Filter Products by Price Range
+    @GetMapping("/price-range")
+    public Page<Product> getProductsByPriceRange(
+            @RequestParam Double minPrice,
+            @RequestParam Double maxPrice,
+            Pageable pageable) {
+        return productService.getProductsByPriceRange(
+                minPrice, maxPrice, pageable);
     }
 }
