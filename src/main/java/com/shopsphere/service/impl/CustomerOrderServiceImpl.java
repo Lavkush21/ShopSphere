@@ -1,7 +1,9 @@
+
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,14 @@ import com.shopsphere.service.CustomerOrderService;
 @Service
 public class CustomerOrderServiceImpl implements CustomerOrderService {
 
+    private static final Set<String> VALID_STATUSES = Set.of(
+            "PENDING",
+            "CONFIRMED",
+            "SHIPPED",
+            "DELIVERED",
+            "CANCELLED"
+    );
+
     private final CustomerOrderRepository orderRepository;
     private final CustomerRepository customerRepository;
 
@@ -23,6 +33,16 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
         this.orderRepository = orderRepository;
         this.customerRepository = customerRepository;
+    }
+
+    private String validateStatus(String status) {
+
+        if (status == null || !VALID_STATUSES.contains(status.toUpperCase())) {
+            throw new RuntimeException("Invalid order status. Valid statuses are: "
+                    + VALID_STATUSES);
+        }
+
+        return status.toUpperCase();
     }
 
     @Override
@@ -47,7 +67,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     @Override
     public CustomerOrder getOrderById(Long id) {
         return orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found with id: " + id));
+                .orElseThrow(() -> new RuntimeException(
+                        "Order not found with id: " + id));
     }
 
     @Override
@@ -65,7 +86,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         CustomerOrder existingOrder = getOrderById(id);
 
         existingOrder.setTotalAmount(order.getTotalAmount());
-        existingOrder.setStatus(order.getStatus());
+        existingOrder.setStatus(validateStatus(order.getStatus()));
 
         return orderRepository.save(existingOrder);
     }
@@ -74,7 +95,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     public CustomerOrder updateOrderStatus(Long id, String status) {
 
         CustomerOrder order = getOrderById(id);
-        order.setStatus(status);
+        order.setStatus(validateStatus(status));
 
         return orderRepository.save(order);
     }
