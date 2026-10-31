@@ -12,6 +12,7 @@ import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.Payment;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.PaymentRepository;
+import com.shopsphere.service.CustomerOrderService;
 import com.shopsphere.service.PaymentService;
 
 @Service
@@ -23,13 +24,16 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final CustomerOrderRepository orderRepository;
+    private final CustomerOrderService customerOrderService;
 
     public PaymentServiceImpl(
             PaymentRepository paymentRepository,
-            CustomerOrderRepository orderRepository) {
+            CustomerOrderRepository orderRepository,
+            CustomerOrderService customerOrderService) {
 
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
+        this.customerOrderService = customerOrderService;
     }
 
     @Override
@@ -43,10 +47,8 @@ public class PaymentServiceImpl implements PaymentService {
                     "Payment already exists for this order");
         }
 
-        if (payment.getAmount() == null
-                || payment.getAmount() <= 0) {
-            throw new RuntimeException(
-                    "Payment amount must be positive");
+        if (payment.getAmount() == null || payment.getAmount() <= 0) {
+            throw new RuntimeException("Payment amount must be positive");
         }
 
         if (payment.getAmount() > order.getTotalAmount()) {
@@ -68,23 +70,19 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public Payment getPaymentById(Long id) {
-
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
     }
 
     @Override
     public Payment getPaymentByOrderId(Long orderId) {
-
         return paymentRepository.findByOrder_Id(orderId)
                 .orElseThrow(() -> new RuntimeException(
                         "Payment not found for this order"));
     }
 
-    // Get payment history by customer ID
     @Override
     public List<Payment> getPaymentHistoryByCustomerId(Long customerId) {
-
         return paymentRepository.findByOrder_Customer_Id(customerId);
     }
 
@@ -96,9 +94,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (status == null
                 || !VALID_STATUSES.contains(status.toUpperCase())) {
-            throw new RuntimeException(
-                    "Invalid payment status. Valid statuses: "
-                    + VALID_STATUSES);
+            throw new RuntimeException("Invalid payment status");
         }
 
         String newStatus = status.toUpperCase();
@@ -142,12 +138,11 @@ public class PaymentServiceImpl implements PaymentService {
                         "Only successful payments can be refunded");
             }
 
-            order.setStatus("CANCELLED");
-            orderRepository.save(order);
+            // Cancel order and restore product stock
+            customerOrderService.cancelOrder(order.getId());
         }
 
         else if ("PENDING".equals(newStatus)) {
-
             throw new RuntimeException(
                     "Payment cannot be changed back to PENDING");
         }
@@ -160,13 +155,11 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public Payment refundPayment(Long id) {
-
         return updatePaymentStatus(id, "REFUNDED");
     }
 
     @Override
     public void deletePayment(Long id) {
-
         Payment payment = getPaymentById(id);
         paymentRepository.delete(payment);
     }

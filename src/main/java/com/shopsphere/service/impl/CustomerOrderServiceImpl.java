@@ -11,23 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.OrderItem;
-import com.shopsphere.entity.Product;
-
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.repository.ProductRepository;
-
 import com.shopsphere.service.CustomerOrderService;
 
 @Service
 public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     private static final Set<String> VALID_STATUSES = Set.of(
-            "PENDING",
-            "CONFIRMED",
-            "SHIPPED",
-            "DELIVERED",
-            "CANCELLED"
+            "PENDING", "CONFIRMED", "SHIPPED",
+            "DELIVERED", "CANCELLED"
     );
 
     private final CustomerOrderRepository orderRepository;
@@ -44,31 +38,15 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         this.productRepository = productRepository;
     }
 
-    private String validateStatus(String status) {
-
-        if (status == null ||
-                !VALID_STATUSES.contains(status.toUpperCase())) {
-
-            throw new RuntimeException(
-                    "Invalid order status. Valid statuses are: "
-                    + VALID_STATUSES);
-        }
-
-        return status.toUpperCase();
-    }
-
     @Override
-    public CustomerOrder createOrder(
-            CustomerOrder order, Long customerId) {
+    public CustomerOrder createOrder(CustomerOrder order, Long customerId) {
 
         Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() ->
-                        new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
 
         order.setCustomer(customer);
-        order.setOrderNumber("ORD-" + System.currentTimeMillis());
-        order.setStatus("PENDING");
         order.setOrderDate(LocalDateTime.now());
+        order.setStatus("PENDING");
 
         return orderRepository.save(order);
     }
@@ -80,20 +58,12 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public CustomerOrder getOrderById(Long id) {
-
         return orderRepository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Order not found with id: " + id));
+                .orElseThrow(() -> new RuntimeException("Order not found"));
     }
 
     @Override
     public List<CustomerOrder> getOrdersByCustomerId(Long customerId) {
-
-        customerRepository.findById(customerId)
-                .orElseThrow(() ->
-                        new RuntimeException("Customer not found"));
-
         return orderRepository.findByCustomer_Id(customerId);
     }
 
@@ -102,8 +72,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
         CustomerOrder existingOrder = getOrderById(id);
 
-        existingOrder.setTotalAmount(order.getTotalAmount());
-        existingOrder.setStatus(validateStatus(order.getStatus()));
+        existingOrder.setStatus(order.getStatus());
 
         return orderRepository.save(existingOrder);
     }
@@ -112,12 +81,16 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     public CustomerOrder updateOrderStatus(Long id, String status) {
 
         CustomerOrder order = getOrderById(id);
-        order.setStatus(validateStatus(status));
+
+        if (status == null || !VALID_STATUSES.contains(status.toUpperCase())) {
+            throw new RuntimeException("Invalid order status");
+        }
+
+        order.setStatus(status.toUpperCase());
 
         return orderRepository.save(order);
     }
 
-    // Cancel order and restore product stock
     @Override
     @Transactional
     public CustomerOrder cancelOrder(Long id) {
@@ -131,18 +104,15 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         if ("SHIPPED".equals(order.getStatus())
                 || "DELIVERED".equals(order.getStatus())) {
             throw new RuntimeException(
-                    "Shipped or delivered order cannot be cancelled");
+                    "Cannot cancel shipped or delivered order");
         }
 
+        // Restore product stock
         for (OrderItem item : order.getOrderItems()) {
 
-            Product product = productRepository.findById(
-                    item.getProduct().getId())
-                    .orElseThrow(() ->
-                            new RuntimeException("Product not found"));
+            var product = item.getProduct();
 
-            product.setStock(
-                    product.getStock() + item.getQuantity());
+            product.setStock(product.getStock() + item.getQuantity());
 
             productRepository.save(product);
         }
@@ -156,6 +126,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     public void deleteOrder(Long id) {
 
         CustomerOrder order = getOrderById(id);
+
         orderRepository.delete(order);
     }
 }
