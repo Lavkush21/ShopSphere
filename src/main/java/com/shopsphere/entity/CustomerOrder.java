@@ -1,3 +1,4 @@
+
 package com.shopsphere.entity;
 
 import java.util.ArrayList;
@@ -87,5 +88,17 @@ public class CustomerOrder {
 
     public void setOrderItems(List<OrderItem> orderItems) {
         this.orderItems = orderItems;
+    }
+
+    // Add order item
+    public void addOrderItem(OrderItem orderItem) {
+        orderItems.add(orderItem);
+        orderItem.setOrder(this);
+    }
+
+    // Remove order item
+    public void removeOrderItem(OrderItem orderItem) {
+        orderItems.remove(orderItem);
+        orderItem.setOrder(null);
     }
 }
