@@ -6,4 +6,6 @@ public interface CheckoutService {
 
     CustomerOrder placeOrder(Long customerId);
 
+    CustomerOrder placeOrder(Long customerId, String couponCode);
+
 }

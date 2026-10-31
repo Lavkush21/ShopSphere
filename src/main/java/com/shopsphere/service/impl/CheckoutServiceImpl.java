@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.shopsphere.entity.Cart;
 import com.shopsphere.entity.CartItem;
+import com.shopsphere.entity.Coupon;
 import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.OrderItem;
@@ -20,8 +21,10 @@ import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.OrderItemRepository;
 import com.shopsphere.repository.ProductRepository;
+import com.shopsphere.repository.CouponRepository;
 
 import com.shopsphere.service.CheckoutService;
+import com.shopsphere.service.CouponApplicationService;
 
 @Service
 public class CheckoutServiceImpl implements CheckoutService {
@@ -32,6 +35,8 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final CustomerOrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
+    private final CouponRepository couponRepository;
+    private final CouponApplicationService couponApplicationService;
 
     public CheckoutServiceImpl(
             CartRepository cartRepository,
@@ -39,7 +44,9 @@ public class CheckoutServiceImpl implements CheckoutService {
             CustomerRepository customerRepository,
             CustomerOrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
-            ProductRepository productRepository) {
+            ProductRepository productRepository,
+            CouponRepository couponRepository,
+            CouponApplicationService couponApplicationService) {
 
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
@@ -47,17 +54,32 @@ public class CheckoutServiceImpl implements CheckoutService {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.productRepository = productRepository;
+        this.couponRepository = couponRepository;
+        this.couponApplicationService = couponApplicationService;
     }
 
     @Override
     @Transactional
     public CustomerOrder placeOrder(Long customerId) {
+        return placeOrderInternal(customerId, null);
+    }
+
+    @Override
+    @Transactional
+    public CustomerOrder placeOrder(Long customerId, String couponCode) {
+        return placeOrderInternal(customerId, couponCode);
+    }
+
+    private CustomerOrder placeOrderInternal(
+            Long customerId, String couponCode) {
 
         Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() ->
+                        new RuntimeException("Customer not found"));
 
         Cart cart = cartRepository.findByCustomerId(customerId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() ->
+                        new RuntimeException("Cart not found"));
 
         List<CartItem> cartItems =
                 cartItemRepository.findByCart_Id(cart.getId());
@@ -68,12 +90,13 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         double totalAmount = 0;
 
-        // Validate stock and calculate total
+        // Validate stock and calculate original total
         for (CartItem cartItem : cartItems) {
 
             Product product = productRepository.findById(
                     cartItem.getProduct().getId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
+                    .orElseThrow(() ->
+                            new RuntimeException("Product not found"));
 
             if (product.getStock() < cartItem.getQuantity()) {
                 throw new RuntimeException(
@@ -81,6 +104,12 @@ public class CheckoutServiceImpl implements CheckoutService {
             }
 
             totalAmount += product.getPrice() * cartItem.getQuantity();
+        }
+
+        // Apply coupon discount if coupon code is provided
+        if (couponCode != null && !couponCode.isBlank()) {
+            totalAmount = couponApplicationService.applyCoupon(
+                    couponCode, totalAmount);
         }
 
         // Create order
@@ -99,7 +128,8 @@ public class CheckoutServiceImpl implements CheckoutService {
 
             Product product = productRepository.findById(
                     cartItem.getProduct().getId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
+                    .orElseThrow(() ->
+                            new RuntimeException("Product not found"));
 
             product.setStock(
                     product.getStock() - cartItem.getQuantity());
@@ -112,15 +142,28 @@ public class CheckoutServiceImpl implements CheckoutService {
             orderItem.setQuantity(cartItem.getQuantity());
             orderItem.setPrice(product.getPrice());
 
-            // Save order item
             OrderItem savedItem = orderItemRepository.save(orderItem);
 
-            // Maintain both sides of relationship
             savedOrder.addOrderItem(savedItem);
         }
 
         // Clear cart after successful checkout
         cartItemRepository.deleteByCart_Id(cart.getId());
+
+        // Increment coupon usage only after successful order processing
+        if (couponCode != null && !couponCode.isBlank()) {
+
+            Coupon coupon = couponRepository.findByCodeIgnoreCase(couponCode)
+                    .orElseThrow(() ->
+                            new RuntimeException("Coupon not found"));
+
+            coupon.setUsedCount(
+                    coupon.getUsedCount() == null
+                            ? 1
+                            : coupon.getUsedCount() + 1);
+
+            couponRepository.save(coupon);
+        }
 
         return savedOrder;
     }
