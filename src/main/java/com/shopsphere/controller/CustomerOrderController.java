@@ -47,6 +47,12 @@ public class CustomerOrderController {
         return orderService.getOrderById(id);
     }
 
+    // Get Order Tracking Details
+    @GetMapping("/{id}/tracking")
+    public CustomerOrder trackOrder(@PathVariable Long id) {
+        return orderService.getOrderById(id);
+    }
+
     // Get Orders By Customer ID
     @GetMapping("/customer/{customerId}")
     public List<CustomerOrder> getOrdersByCustomerId(
@@ -82,9 +88,7 @@ public class CustomerOrderController {
     // Delete Order
     @DeleteMapping("/{id}")
     public String deleteOrder(@PathVariable Long id) {
-
         orderService.deleteOrder(id);
-
         return "Order deleted successfully";
     }
 }

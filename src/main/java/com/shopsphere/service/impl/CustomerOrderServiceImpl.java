@@ -20,8 +20,11 @@ import com.shopsphere.service.CustomerOrderService;
 public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     private static final Set<String> VALID_STATUSES = Set.of(
-            "PENDING", "CONFIRMED", "SHIPPED",
-            "DELIVERED", "CANCELLED"
+            "PENDING",
+            "CONFIRMED",
+            "SHIPPED",
+            "DELIVERED",
+            "CANCELLED"
     );
 
     private final CustomerOrderRepository orderRepository;
@@ -38,6 +41,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         this.productRepository = productRepository;
     }
 
+    // Create Order
     @Override
     public CustomerOrder createOrder(CustomerOrder order, Long customerId) {
 
@@ -51,46 +55,66 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         return orderRepository.save(order);
     }
 
+    // Get All Orders
     @Override
     public List<CustomerOrder> getAllOrders() {
         return orderRepository.findAll();
     }
 
+    // Get Order By ID
     @Override
     public CustomerOrder getOrderById(Long id) {
+
         return orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
     }
 
+    // Get Orders By Customer ID
     @Override
     public List<CustomerOrder> getOrdersByCustomerId(Long customerId) {
+
         return orderRepository.findByCustomer_Id(customerId);
     }
 
+    // Update Order
     @Override
     public CustomerOrder updateOrder(Long id, CustomerOrder order) {
 
-        CustomerOrder existingOrder = getOrderById(id);
+        if (order.getStatus() == null) {
+            throw new RuntimeException("Order status cannot be empty");
+        }
 
-        existingOrder.setStatus(order.getStatus());
-
-        return orderRepository.save(existingOrder);
+        return updateOrderStatus(id, order.getStatus());
     }
 
+    // Update Order Status With Validation
     @Override
     public CustomerOrder updateOrderStatus(Long id, String status) {
 
         CustomerOrder order = getOrderById(id);
 
-        if (status == null || !VALID_STATUSES.contains(status.toUpperCase())) {
-            throw new RuntimeException("Invalid order status");
+        if (status == null || status.trim().isEmpty()) {
+            throw new RuntimeException("Order status cannot be empty");
         }
 
-        order.setStatus(status.toUpperCase());
+        String normalizedStatus = status.trim().toUpperCase();
+
+        if (!VALID_STATUSES.contains(normalizedStatus)) {
+            throw new RuntimeException(
+                    "Invalid order status. Allowed statuses: "
+                    + VALID_STATUSES);
+        }
+
+        if ("CANCELLED".equals(order.getStatus())) {
+            throw new RuntimeException("Cannot update a cancelled order");
+        }
+
+        order.setStatus(normalizedStatus);
 
         return orderRepository.save(order);
     }
 
+    // Cancel Order and Restore Product Stock
     @Override
     @Transactional
     public CustomerOrder cancelOrder(Long id) {
@@ -107,7 +131,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                     "Cannot cancel shipped or delivered order");
         }
 
-        // Restore product stock
+        // Restore Product Stock
         for (OrderItem item : order.getOrderItems()) {
 
             var product = item.getProduct();
@@ -122,6 +146,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         return orderRepository.save(order);
     }
 
+    // Delete Order
     @Override
     public void deleteOrder(Long id) {
 
