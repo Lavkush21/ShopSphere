@@ -28,4 +28,8 @@ public interface ProductService {
     // Filter products by price range
     Page<Product> getProductsByPriceRange(
             Double minPrice, Double maxPrice, Pageable pageable);
+
+    // Sort products
+    Page<Product> sortProducts(
+            String sortBy, String direction, int page, int size);
 }

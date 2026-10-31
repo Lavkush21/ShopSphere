@@ -3,7 +3,9 @@ package com.shopsphere.service.impl;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.shopsphere.entity.Product;
@@ -73,5 +75,28 @@ public class ProductServiceImpl implements ProductService {
         }
 
         return productRepository.findByPriceBetween(minPrice, maxPrice, pageable);
+    }
+
+    // Sort products by price or name
+    @Override
+    public Page<Product> sortProducts(
+            String sortBy, String direction, int page, int size) {
+
+        if (!sortBy.equals("price") && !sortBy.equals("name")) {
+            throw new IllegalArgumentException("Sort by must be price or name");
+        }
+
+        if (!direction.equalsIgnoreCase("asc")
+                && !direction.equalsIgnoreCase("desc")) {
+            throw new IllegalArgumentException("Direction must be asc or desc");
+        }
+
+        Sort sort = direction.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
+
+        return productRepository.findAll(pageRequest);
     }
 }

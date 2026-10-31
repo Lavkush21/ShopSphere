@@ -81,4 +81,15 @@ public class ProductController {
         return productService.getProductsByPriceRange(
                 minPrice, maxPrice, pageable);
     }
+
+    // Sort Products
+    @GetMapping("/sort")
+    public Page<Product> sortProducts(
+            @RequestParam(defaultValue = "price") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
+
+        return productService.sortProducts(sortBy, direction, page, size);
+    }
 }
