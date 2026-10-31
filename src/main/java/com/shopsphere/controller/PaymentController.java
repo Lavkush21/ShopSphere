@@ -22,6 +22,7 @@ public class PaymentController {
         this.paymentService = paymentService;
     }
 
+    // Create Payment
     @PostMapping
     public ResponseEntity<Payment> createPayment(
             @RequestParam Long orderId,
@@ -32,23 +33,41 @@ public class PaymentController {
                 HttpStatus.CREATED);
     }
 
+    // Get All Payments
     @GetMapping
     public ResponseEntity<List<Payment>> getAllPayments() {
+
         return ResponseEntity.ok(paymentService.getAllPayments());
     }
 
+    // Get Payment By ID
     @GetMapping("/{id}")
-    public ResponseEntity<Payment> getPaymentById(@PathVariable Long id) {
-        return ResponseEntity.ok(paymentService.getPaymentById(id));
+    public ResponseEntity<Payment> getPaymentById(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                paymentService.getPaymentById(id));
     }
 
+    // Get Payment By Order ID
     @GetMapping("/order/{orderId}")
     public ResponseEntity<Payment> getPaymentByOrderId(
             @PathVariable Long orderId) {
 
-        return ResponseEntity.ok(paymentService.getPaymentByOrderId(orderId));
+        return ResponseEntity.ok(
+                paymentService.getPaymentByOrderId(orderId));
     }
 
+    // Get Payment History By Customer ID
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<List<Payment>> getPaymentHistoryByCustomerId(
+            @PathVariable Long customerId) {
+
+        return ResponseEntity.ok(
+                paymentService.getPaymentHistoryByCustomerId(customerId));
+    }
+
+    // Update Payment Status
     @PutMapping("/{id}/status")
     public ResponseEntity<Payment> updatePaymentStatus(
             @PathVariable Long id,
@@ -58,10 +77,23 @@ public class PaymentController {
                 paymentService.updatePaymentStatus(id, status));
     }
 
+    // Refund Payment
+    @PutMapping("/{id}/refund")
+    public ResponseEntity<Payment> refundPayment(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                paymentService.refundPayment(id));
+    }
+
+    // Delete Payment
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> deletePayment(@PathVariable Long id) {
+    public ResponseEntity<String> deletePayment(
+            @PathVariable Long id) {
 
         paymentService.deletePayment(id);
-        return ResponseEntity.ok("Payment deleted successfully");
+
+        return ResponseEntity.ok(
+                "Payment deleted successfully");
     }
 }

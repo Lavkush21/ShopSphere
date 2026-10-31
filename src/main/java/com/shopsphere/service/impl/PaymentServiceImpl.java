@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.Payment;
@@ -38,16 +39,19 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
         if (paymentRepository.existsByOrder_Id(orderId)) {
-            throw new RuntimeException("Payment already exists for this order");
+            throw new RuntimeException(
+                    "Payment already exists for this order");
         }
 
         if (payment.getAmount() == null
                 || payment.getAmount() <= 0) {
-            throw new RuntimeException("Payment amount must be positive");
+            throw new RuntimeException(
+                    "Payment amount must be positive");
         }
 
         if (payment.getAmount() > order.getTotalAmount()) {
-            throw new RuntimeException("Payment amount cannot exceed order total");
+            throw new RuntimeException(
+                    "Payment amount cannot exceed order total");
         }
 
         payment.setOrder(order);
@@ -64,33 +68,105 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public Payment getPaymentById(Long id) {
+
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
     }
 
     @Override
     public Payment getPaymentByOrderId(Long orderId) {
+
         return paymentRepository.findByOrder_Id(orderId)
-                .orElseThrow(() -> new RuntimeException("Payment not found for this order"));
+                .orElseThrow(() -> new RuntimeException(
+                        "Payment not found for this order"));
+    }
+
+    // Get payment history by customer ID
+    @Override
+    public List<Payment> getPaymentHistoryByCustomerId(Long customerId) {
+
+        return paymentRepository.findByOrder_Customer_Id(customerId);
     }
 
     @Override
+    @Transactional
     public Payment updatePaymentStatus(Long id, String status) {
 
         Payment payment = getPaymentById(id);
 
-        if (status == null || !VALID_STATUSES.contains(status.toUpperCase())) {
-            throw new RuntimeException("Invalid payment status. Valid statuses: "
+        if (status == null
+                || !VALID_STATUSES.contains(status.toUpperCase())) {
+            throw new RuntimeException(
+                    "Invalid payment status. Valid statuses: "
                     + VALID_STATUSES);
         }
 
-        payment.setPaymentStatus(status.toUpperCase());
+        String newStatus = status.toUpperCase();
+        String currentStatus = payment.getPaymentStatus();
+
+        CustomerOrder order = payment.getOrder();
+
+        if ("SUCCESS".equals(newStatus)) {
+
+            if (!"PENDING".equals(currentStatus)) {
+                throw new RuntimeException(
+                        "Only pending payments can be marked as SUCCESS");
+            }
+
+            if ("CANCELLED".equals(order.getStatus())) {
+                throw new RuntimeException(
+                        "Cannot pay for a cancelled order");
+            }
+
+            if (!payment.getAmount().equals(order.getTotalAmount())) {
+                throw new RuntimeException(
+                        "Payment amount must match order total");
+            }
+
+            order.setStatus("CONFIRMED");
+            orderRepository.save(order);
+        }
+
+        else if ("FAILED".equals(newStatus)) {
+
+            if (!"PENDING".equals(currentStatus)) {
+                throw new RuntimeException(
+                        "Only pending payments can be marked as FAILED");
+            }
+        }
+
+        else if ("REFUNDED".equals(newStatus)) {
+
+            if (!"SUCCESS".equals(currentStatus)) {
+                throw new RuntimeException(
+                        "Only successful payments can be refunded");
+            }
+
+            order.setStatus("CANCELLED");
+            orderRepository.save(order);
+        }
+
+        else if ("PENDING".equals(newStatus)) {
+
+            throw new RuntimeException(
+                    "Payment cannot be changed back to PENDING");
+        }
+
+        payment.setPaymentStatus(newStatus);
 
         return paymentRepository.save(payment);
     }
 
     @Override
+    @Transactional
+    public Payment refundPayment(Long id) {
+
+        return updatePaymentStatus(id, "REFUNDED");
+    }
+
+    @Override
     public void deletePayment(Long id) {
+
         Payment payment = getPaymentById(id);
         paymentRepository.delete(payment);
     }
