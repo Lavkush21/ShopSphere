@@ -14,7 +14,6 @@ import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.OrderItem;
 import com.shopsphere.entity.Product;
-
 import com.shopsphere.repository.CartItemRepository;
 import com.shopsphere.repository.CartRepository;
 import com.shopsphere.repository.CustomerRepository;
@@ -22,9 +21,9 @@ import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.OrderItemRepository;
 import com.shopsphere.repository.ProductRepository;
 import com.shopsphere.repository.CouponRepository;
-
 import com.shopsphere.service.CheckoutService;
 import com.shopsphere.service.CouponApplicationService;
+import com.shopsphere.service.InventoryService;
 
 @Service
 public class CheckoutServiceImpl implements CheckoutService {
@@ -37,6 +36,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final ProductRepository productRepository;
     private final CouponRepository couponRepository;
     private final CouponApplicationService couponApplicationService;
+    private final InventoryService inventoryService;
 
     public CheckoutServiceImpl(
             CartRepository cartRepository,
@@ -46,7 +46,8 @@ public class CheckoutServiceImpl implements CheckoutService {
             OrderItemRepository orderItemRepository,
             ProductRepository productRepository,
             CouponRepository couponRepository,
-            CouponApplicationService couponApplicationService) {
+            CouponApplicationService couponApplicationService,
+            InventoryService inventoryService) {
 
         this.cartRepository = cartRepository;
         this.cartItemRepository = cartItemRepository;
@@ -56,6 +57,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         this.productRepository = productRepository;
         this.couponRepository = couponRepository;
         this.couponApplicationService = couponApplicationService;
+        this.inventoryService = inventoryService;
     }
 
     @Override
@@ -90,7 +92,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         double totalAmount = 0;
 
-        // Validate stock and calculate original total
+        // Validate product stock and inventory availability
         for (CartItem cartItem : cartItems) {
 
             Product product = productRepository.findById(
@@ -106,7 +108,7 @@ public class CheckoutServiceImpl implements CheckoutService {
             totalAmount += product.getPrice() * cartItem.getQuantity();
         }
 
-        // Apply coupon discount if coupon code is provided
+        // Apply coupon discount
         if (couponCode != null && !couponCode.isBlank()) {
             totalAmount = couponApplicationService.applyCoupon(
                     couponCode, totalAmount);
@@ -123,7 +125,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         CustomerOrder savedOrder = orderRepository.save(order);
 
-        // Create order items and update stock
+        // Create order items and synchronize stock
         for (CartItem cartItem : cartItems) {
 
             Product product = productRepository.findById(
@@ -131,10 +133,11 @@ public class CheckoutServiceImpl implements CheckoutService {
                     .orElseThrow(() ->
                             new RuntimeException("Product not found"));
 
-            product.setStock(
-                    product.getStock() - cartItem.getQuantity());
-
-            productRepository.save(product);
+            // Decrease Product and Inventory stock together
+            inventoryService.adjustStock(
+                    product.getId(),
+                    -cartItem.getQuantity(),
+                    "CHECKOUT");
 
             OrderItem orderItem = new OrderItem();
 
@@ -147,10 +150,10 @@ public class CheckoutServiceImpl implements CheckoutService {
             savedOrder.addOrderItem(savedItem);
         }
 
-        // Clear cart after successful checkout
+        // Clear cart
         cartItemRepository.deleteByCart_Id(cart.getId());
 
-        // Increment coupon usage only after successful order processing
+        // Update coupon usage
         if (couponCode != null && !couponCode.isBlank()) {
 
             Coupon coupon = couponRepository.findByCodeIgnoreCase(couponCode)

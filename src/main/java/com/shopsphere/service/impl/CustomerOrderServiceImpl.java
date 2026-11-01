@@ -12,14 +12,13 @@ import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.OrderItem;
 import com.shopsphere.entity.OrderStatusHistory;
-import com.shopsphere.entity.Product;
 
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.repository.OrderStatusHistoryRepository;
-import com.shopsphere.repository.ProductRepository;
 
 import com.shopsphere.service.CustomerOrderService;
+import com.shopsphere.service.InventoryService;
 import com.shopsphere.service.OrderEmailNotificationService;
 
 @Service
@@ -30,30 +29,30 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             "CONFIRMED",
             "SHIPPED",
             "DELIVERED",
-            "CANCELLED"
+            "CANCELLED",
+            "RETURNED"
     );
 
     private final CustomerOrderRepository orderRepository;
     private final CustomerRepository customerRepository;
-    private final ProductRepository productRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderEmailNotificationService orderEmailNotificationService;
+    private final InventoryService inventoryService;
 
     public CustomerOrderServiceImpl(
             CustomerOrderRepository orderRepository,
             CustomerRepository customerRepository,
-            ProductRepository productRepository,
             OrderStatusHistoryRepository historyRepository,
-            OrderEmailNotificationService orderEmailNotificationService) {
+            OrderEmailNotificationService orderEmailNotificationService,
+            InventoryService inventoryService) {
 
         this.orderRepository = orderRepository;
         this.customerRepository = customerRepository;
-        this.productRepository = productRepository;
         this.historyRepository = historyRepository;
         this.orderEmailNotificationService = orderEmailNotificationService;
+        this.inventoryService = inventoryService;
     }
 
-    // Create Order
     @Override
     public CustomerOrder createOrder(CustomerOrder order, Long customerId) {
 
@@ -66,14 +65,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
         CustomerOrder savedOrder = orderRepository.save(order);
 
-        saveStatusHistory(
-                savedOrder,
-                null,
-                "PENDING",
-                "Order created"
-        );
+        saveStatusHistory(savedOrder, null, "PENDING", "Order created");
 
-        // Send Order Confirmation Email
         try {
             orderEmailNotificationService.sendOrderConfirmation(
                     customer.getEmail(),
@@ -87,32 +80,24 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         return savedOrder;
     }
 
-    // Get All Orders
     @Override
     public List<CustomerOrder> getAllOrders() {
         return orderRepository.findAll();
     }
 
-    // Get Order By ID
     @Override
     public CustomerOrder getOrderById(Long id) {
-
         return orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
     }
 
-    // Get Orders By Customer ID
     @Override
     public List<CustomerOrder> getOrdersByCustomerId(Long customerId) {
-
         return orderRepository.findByCustomer_Id(customerId);
     }
 
-    // Update Order
     @Override
     public CustomerOrder updateOrder(Long id, CustomerOrder updatedOrder) {
-
-        CustomerOrder existingOrder = getOrderById(id);
 
         if (updatedOrder.getStatus() == null) {
             throw new RuntimeException("Order status cannot be null");
@@ -121,7 +106,6 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         return updateOrderStatus(id, updatedOrder.getStatus());
     }
 
-    // Update Order Status
     @Override
     public CustomerOrder updateOrderStatus(Long id, String status) {
 
@@ -134,13 +118,20 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         String newStatus = status.trim().toUpperCase();
 
         if (!VALID_STATUSES.contains(newStatus)) {
+            throw new RuntimeException("Invalid order status");
+        }
+
+        if ("CANCELLED".equals(order.getStatus())
+                || "RETURNED".equals(order.getStatus())) {
             throw new RuntimeException(
-                    "Invalid order status. Allowed statuses: " + VALID_STATUSES
+                    "Cancelled or returned order cannot be updated"
             );
         }
 
-        if ("CANCELLED".equals(order.getStatus())) {
-            throw new RuntimeException("Cancelled order cannot be updated");
+        if ("RETURNED".equals(newStatus)) {
+            throw new RuntimeException(
+                    "Order can be marked RETURNED only through return completion"
+            );
         }
 
         String previousStatus = order.getStatus();
@@ -164,7 +155,6 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         return order;
     }
 
-    // Cancel Order
     @Override
     @Transactional
     public CustomerOrder cancelOrder(Long id) {
@@ -176,29 +166,16 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
 
         if ("SHIPPED".equals(order.getStatus())
-                || "DELIVERED".equals(order.getStatus())) {
-
+                || "DELIVERED".equals(order.getStatus())
+                || "RETURNED".equals(order.getStatus())) {
             throw new RuntimeException(
-                    "Shipped or delivered order cannot be cancelled"
+                    "Shipped, delivered or returned order cannot be cancelled"
             );
         }
 
         String previousStatus = order.getStatus();
 
-        // Restore product stock
-        if (order.getOrderItems() != null) {
-
-            for (OrderItem item : order.getOrderItems()) {
-
-                Product product = item.getProduct();
-
-                product.setStock(
-                        product.getStock() + item.getQuantity()
-                );
-
-                productRepository.save(product);
-            }
-        }
+        restoreInventoryStock(order, "ORDER_CANCELLATION");
 
         order.setStatus("CANCELLED");
 
@@ -208,21 +185,68 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 savedOrder,
                 previousStatus,
                 "CANCELLED",
-                "Order cancelled and product stock restored"
+                "Order cancelled and inventory stock restored"
         );
 
         return savedOrder;
     }
 
-    // Delete Order
+    @Override
+    @Transactional
+    public CustomerOrder completeReturn(Long id) {
+
+        CustomerOrder order = getOrderById(id);
+
+        if (!"DELIVERED".equals(order.getStatus())) {
+            throw new RuntimeException(
+                    "Only delivered orders can be returned"
+            );
+        }
+
+        String previousStatus = order.getStatus();
+
+        restoreInventoryStock(order, "RETURN_COMPLETED");
+
+        order.setStatus("RETURNED");
+
+        CustomerOrder savedOrder = orderRepository.save(order);
+
+        saveStatusHistory(
+                savedOrder,
+                previousStatus,
+                "RETURNED",
+                "Return completed and inventory stock restored"
+        );
+
+        return savedOrder;
+    }
+
+    private void restoreInventoryStock(
+            CustomerOrder order,
+            String reason) {
+
+        if (order.getOrderItems() != null) {
+
+            for (OrderItem item : order.getOrderItems()) {
+
+                Long productId = item.getProduct().getId();
+                Integer quantity = item.getQuantity();
+
+                inventoryService.adjustStock(
+                        productId,
+                        quantity,
+                        reason
+                );
+            }
+        }
+    }
+
     @Override
     public void deleteOrder(Long id) {
-
         CustomerOrder order = getOrderById(id);
         orderRepository.delete(order);
     }
 
-    // Save Order Status History
     private void saveStatusHistory(
             CustomerOrder order,
             String previousStatus,
