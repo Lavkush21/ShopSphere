@@ -1,5 +1,7 @@
 package com.shopsphere.service.impl;
 
+import java.util.Locale;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -28,19 +30,20 @@ public class AuthServiceImpl implements AuthService {
         this.jwtService = jwtService;
     }
 
-    // User Registration
     @Override
     public AuthResponse register(RegisterRequest request) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String email = request.getEmail()
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        if (userRepository.existsByEmail(email)) {
             throw new RuntimeException("Email already registered");
         }
 
         User user = new User();
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
-
-        // Encrypt password
+        user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
         userRepository.save(user);
@@ -50,14 +53,21 @@ public class AuthServiceImpl implements AuthService {
         return new AuthResponse(token, "User registered successfully");
     }
 
-    // User Login
     @Override
     public AuthResponse login(LoginRequest request) {
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+        String email = request.getEmail()
+                .trim()
+                .toLowerCase(Locale.ROOT);
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new RuntimeException("Invalid email or password"));
+
+        if (!passwordEncoder.matches(
+                request.getPassword(),
+                user.getPassword())) {
+
             throw new RuntimeException("Invalid email or password");
         }
 

@@ -1,4 +1,3 @@
-
 package com.shopsphere.service;
 
 import java.util.List;
@@ -20,6 +19,8 @@ public interface CustomerOrderService {
     CustomerOrder updateOrderStatus(Long id, String status);
 
     CustomerOrder cancelOrder(Long id);
+
+    CustomerOrder completeReturn(Long id);
 
     void deleteOrder(Long id);
 }

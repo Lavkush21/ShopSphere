@@ -1,3 +1,4 @@
+
 package com.shopsphere.dto;
 
 import jakarta.validation.constraints.Email;
@@ -33,7 +34,7 @@ public class RegisterRequest {
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email = email == null ? null : email.trim();
     }
 
     public String getPassword() {

@@ -14,6 +14,8 @@ public interface InventoryService {
 
     Inventory updateStock(Long productId, Integer quantity);
 
+    Inventory adjustStock(Long productId, Integer changeQuantity, String reason);
+
     Inventory updateLowStockThreshold(Long productId, Integer threshold);
 
     List<Inventory> getLowStockProducts();
