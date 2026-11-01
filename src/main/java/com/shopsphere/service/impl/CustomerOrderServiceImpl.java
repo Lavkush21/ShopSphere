@@ -12,11 +12,9 @@ import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.OrderItem;
 import com.shopsphere.entity.OrderStatusHistory;
-
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.repository.OrderStatusHistoryRepository;
-
 import com.shopsphere.service.CustomerOrderService;
 import com.shopsphere.service.InventoryService;
 import com.shopsphere.service.OrderEmailNotificationService;
@@ -116,13 +114,18 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         }
 
         String newStatus = status.trim().toUpperCase();
+        String previousStatus = order.getStatus();
 
         if (!VALID_STATUSES.contains(newStatus)) {
             throw new RuntimeException("Invalid order status");
         }
 
-        if ("CANCELLED".equals(order.getStatus())
-                || "RETURNED".equals(order.getStatus())) {
+        if (previousStatus.equals(newStatus)) {
+            return order;
+        }
+
+        if ("CANCELLED".equals(previousStatus)
+                || "RETURNED".equals(previousStatus)) {
             throw new RuntimeException(
                     "Cancelled or returned order cannot be updated"
             );
@@ -134,25 +137,46 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             );
         }
 
-        String previousStatus = order.getStatus();
-
-        if (!previousStatus.equals(newStatus)) {
-
-            order.setStatus(newStatus);
-
-            CustomerOrder savedOrder = orderRepository.save(order);
-
-            saveStatusHistory(
-                    savedOrder,
-                    previousStatus,
-                    newStatus,
-                    "Order status updated"
+        if (!isValidTransition(previousStatus, newStatus)) {
+            throw new RuntimeException(
+                    "Invalid order status transition: "
+                    + previousStatus + " to " + newStatus
             );
-
-            return savedOrder;
         }
 
-        return order;
+        order.setStatus(newStatus);
+
+        CustomerOrder savedOrder = orderRepository.save(order);
+
+        saveStatusHistory(
+                savedOrder,
+                previousStatus,
+                newStatus,
+                "Order status updated"
+        );
+
+        return savedOrder;
+    }
+
+    private boolean isValidTransition(String currentStatus, String newStatus) {
+
+        switch (currentStatus) {
+
+            case "PENDING":
+                return "CONFIRMED".equals(newStatus);
+
+            case "CONFIRMED":
+                return "SHIPPED".equals(newStatus);
+
+            case "SHIPPED":
+                return "DELIVERED".equals(newStatus);
+
+            case "DELIVERED":
+                return false;
+
+            default:
+                return false;
+        }
     }
 
     @Override
@@ -165,11 +189,10 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
             throw new RuntimeException("Order is already cancelled");
         }
 
-        if ("SHIPPED".equals(order.getStatus())
-                || "DELIVERED".equals(order.getStatus())
-                || "RETURNED".equals(order.getStatus())) {
+        if (!"PENDING".equals(order.getStatus())
+                && !"CONFIRMED".equals(order.getStatus())) {
             throw new RuntimeException(
-                    "Shipped, delivered or returned order cannot be cancelled"
+                    "Only pending or confirmed orders can be cancelled"
             );
         }
 
@@ -221,9 +244,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         return savedOrder;
     }
 
-    private void restoreInventoryStock(
-            CustomerOrder order,
-            String reason) {
+    private void restoreInventoryStock(CustomerOrder order, String reason) {
 
         if (order.getOrderItems() != null) {
 
@@ -243,6 +264,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
     @Override
     public void deleteOrder(Long id) {
+
         CustomerOrder order = getOrderById(id);
         orderRepository.delete(order);
     }

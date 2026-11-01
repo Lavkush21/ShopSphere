@@ -11,6 +11,7 @@ import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.Shipment;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.ShipmentRepository;
+import com.shopsphere.service.CustomerOrderService;
 import com.shopsphere.service.ShipmentService;
 import com.shopsphere.service.OrderEmailNotificationService;
 
@@ -20,15 +21,18 @@ public class ShipmentServiceImpl implements ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
     private final CustomerOrderRepository orderRepository;
+    private final CustomerOrderService customerOrderService;
     private final OrderEmailNotificationService orderEmailNotificationService;
 
     public ShipmentServiceImpl(
             ShipmentRepository shipmentRepository,
             CustomerOrderRepository orderRepository,
+            CustomerOrderService customerOrderService,
             OrderEmailNotificationService orderEmailNotificationService) {
 
         this.shipmentRepository = shipmentRepository;
         this.orderRepository = orderRepository;
+        this.customerOrderService = customerOrderService;
         this.orderEmailNotificationService = orderEmailNotificationService;
     }
 
@@ -56,8 +60,9 @@ public class ShipmentServiceImpl implements ShipmentService {
             throw new RuntimeException("Tracking number already exists");
         }
 
-        if ("CANCELLED".equalsIgnoreCase(order.getStatus())) {
-            throw new RuntimeException("Cannot ship a cancelled order");
+        if (!"CONFIRMED".equals(order.getStatus())) {
+            throw new RuntimeException(
+                    "Only confirmed orders can be shipped");
         }
 
         Shipment shipment = new Shipment();
@@ -106,6 +111,7 @@ public class ShipmentServiceImpl implements ShipmentService {
         }
 
         String newStatus = status.trim().toUpperCase();
+        String currentStatus = shipment.getStatus();
 
         if (!List.of("CREATED", "SHIPPED", "IN_TRANSIT",
                 "OUT_FOR_DELIVERY", "DELIVERED", "RETURNED")
@@ -114,52 +120,59 @@ public class ShipmentServiceImpl implements ShipmentService {
             throw new RuntimeException("Invalid shipment status");
         }
 
-        if ("DELIVERED".equals(shipment.getStatus())
-                || "RETURNED".equals(shipment.getStatus())) {
+        if ("DELIVERED".equals(currentStatus)
+                || "RETURNED".equals(currentStatus)) {
 
             throw new RuntimeException("Shipment is already completed");
         }
 
-        shipment.setStatus(newStatus);
+        CustomerOrder order = shipment.getOrder();
 
-        // Shipment notification email
-        if ("SHIPPED".equals(newStatus) && shipment.getShippedAt() == null) {
+        // Update order status when shipment is shipped
+        if ("SHIPPED".equals(newStatus)
+                && !"SHIPPED".equals(currentStatus)) {
 
-            shipment.setShippedAt(LocalDateTime.now());
+            customerOrderService.updateOrderStatus(
+                    order.getId(), "SHIPPED");
 
-            try {
-                CustomerOrder order = shipment.getOrder();
+            if (shipment.getShippedAt() == null) {
+                shipment.setShippedAt(LocalDateTime.now());
 
-                orderEmailNotificationService.sendShipmentNotification(
-                        order.getCustomer().getEmail(),
-                        order.getId(),
-                        shipment.getTrackingNumber()
-                );
-
-            } catch (Exception e) {
-                System.err.println(
-                        "Shipment notification email failed: " + e.getMessage());
+                try {
+                    orderEmailNotificationService.sendShipmentNotification(
+                            order.getCustomer().getEmail(),
+                            order.getId(),
+                            shipment.getTrackingNumber()
+                    );
+                } catch (Exception e) {
+                    System.err.println(
+                            "Shipment notification email failed: "
+                                    + e.getMessage());
+                }
             }
         }
 
-        // Delivery confirmation email
+        // Update order status when shipment is delivered
         if ("DELIVERED".equals(newStatus)) {
+
+            customerOrderService.updateOrderStatus(
+                    order.getId(), "DELIVERED");
 
             shipment.setDeliveredAt(LocalDateTime.now());
 
             try {
-                CustomerOrder order = shipment.getOrder();
-
                 orderEmailNotificationService.sendDeliveryConfirmation(
                         order.getCustomer().getEmail(),
                         order.getId()
                 );
-
             } catch (Exception e) {
                 System.err.println(
-                        "Delivery confirmation email failed: " + e.getMessage());
+                        "Delivery confirmation email failed: "
+                                + e.getMessage());
             }
         }
+
+        shipment.setStatus(newStatus);
 
         return shipmentRepository.save(shipment);
     }

@@ -1,3 +1,4 @@
+
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,7 @@ import com.shopsphere.service.OrderEmailNotificationService;
 import com.shopsphere.service.PaymentService;
 
 @Service
+@Transactional
 public class PaymentServiceImpl implements PaymentService {
 
     private static final Set<String> VALID_STATUSES = Set.of(
@@ -59,6 +61,11 @@ public class PaymentServiceImpl implements PaymentService {
                     "Payment amount cannot exceed order total");
         }
 
+        if (!"PENDING".equals(order.getStatus())) {
+            throw new RuntimeException(
+                    "Payment can only be created for pending orders");
+        }
+
         payment.setOrder(order);
         payment.setPaymentStatus("PENDING");
         payment.setPaymentDate(LocalDateTime.now());
@@ -67,17 +74,20 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Payment> getAllPayments() {
         return paymentRepository.findAll();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Payment getPaymentById(Long id) {
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Payment getPaymentByOrderId(Long orderId) {
         return paymentRepository.findByOrder_Id(orderId)
                 .orElseThrow(() -> new RuntimeException(
@@ -85,23 +95,26 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Payment> getPaymentHistoryByCustomerId(Long customerId) {
         return paymentRepository.findByOrder_Customer_Id(customerId);
     }
 
     @Override
-    @Transactional
     public Payment updatePaymentStatus(Long id, String status) {
 
         Payment payment = getPaymentById(id);
 
-        if (status == null
-                || !VALID_STATUSES.contains(status.toUpperCase())) {
-            throw new RuntimeException("Invalid payment status");
+        if (status == null || status.isBlank()) {
+            throw new RuntimeException("Payment status is required");
         }
 
-        String newStatus = status.toUpperCase();
+        String newStatus = status.trim().toUpperCase();
         String currentStatus = payment.getPaymentStatus();
+
+        if (!VALID_STATUSES.contains(newStatus)) {
+            throw new RuntimeException("Invalid payment status");
+        }
 
         CustomerOrder order = payment.getOrder();
 
@@ -112,9 +125,9 @@ public class PaymentServiceImpl implements PaymentService {
                         "Only pending payments can be marked as SUCCESS");
             }
 
-            if ("CANCELLED".equals(order.getStatus())) {
+            if (!"PENDING".equals(order.getStatus())) {
                 throw new RuntimeException(
-                        "Cannot pay for a cancelled order");
+                        "Only pending orders can be confirmed through payment");
             }
 
             if (!payment.getAmount().equals(order.getTotalAmount())) {
@@ -122,8 +135,9 @@ public class PaymentServiceImpl implements PaymentService {
                         "Payment amount must match order total");
             }
 
-            order.setStatus("CONFIRMED");
-            orderRepository.save(order);
+            // Update order status and automatically save status history
+            customerOrderService.updateOrderStatus(
+                    order.getId(), "CONFIRMED");
         }
 
         else if ("FAILED".equals(newStatus)) {
@@ -145,6 +159,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         else if ("PENDING".equals(newStatus)) {
+
             throw new RuntimeException(
                     "Payment cannot be changed back to PENDING");
         }
@@ -170,14 +185,12 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional
     public Payment refundPayment(Long id) {
         return updatePaymentStatus(id, "REFUNDED");
     }
 
     // Refund payment after an approved return
     @Override
-    @Transactional
     public Payment refundForReturn(Long paymentId) {
 
         Payment payment = getPaymentById(paymentId);
