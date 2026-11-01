@@ -8,9 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.shopsphere.entity.CustomerOrder;
+import com.shopsphere.entity.Payment;
 import com.shopsphere.entity.ReturnRequest;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.ReturnRequestRepository;
+import com.shopsphere.service.PaymentService;
 import com.shopsphere.service.ReturnRequestService;
 
 @Service
@@ -19,12 +21,16 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
 
     private final ReturnRequestRepository returnRequestRepository;
     private final CustomerOrderRepository orderRepository;
+    private final PaymentService paymentService;
 
     public ReturnRequestServiceImpl(
             ReturnRequestRepository returnRequestRepository,
-            CustomerOrderRepository orderRepository) {
+            CustomerOrderRepository orderRepository,
+            PaymentService paymentService) {
+
         this.returnRequestRepository = returnRequestRepository;
         this.orderRepository = orderRepository;
+        this.paymentService = paymentService;
     }
 
     @Override
@@ -110,6 +116,16 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
         }
 
         if ("COMPLETED".equals(newStatus)) {
+
+            CustomerOrder order = request.getOrder();
+
+            // Find payment associated with this order
+            Payment payment = paymentService.getPaymentByOrderId(
+                    order.getId());
+
+            // Refund payment and restore product stock
+            paymentService.refundForReturn(payment.getId());
+
             request.setCompletedDate(LocalDateTime.now());
         }
 

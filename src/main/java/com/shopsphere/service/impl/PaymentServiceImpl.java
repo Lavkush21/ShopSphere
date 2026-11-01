@@ -1,4 +1,3 @@
-
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
@@ -142,7 +141,6 @@ public class PaymentServiceImpl implements PaymentService {
                         "Only successful payments can be refunded");
             }
 
-            // Cancel order and restore product stock
             customerOrderService.cancelOrder(order.getId());
         }
 
@@ -155,7 +153,6 @@ public class PaymentServiceImpl implements PaymentService {
 
         Payment savedPayment = paymentRepository.save(payment);
 
-        // Send Payment Success Email
         if ("SUCCESS".equals(newStatus)) {
             try {
                 orderEmailNotificationService.sendPaymentSuccess(
@@ -176,6 +173,34 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public Payment refundPayment(Long id) {
         return updatePaymentStatus(id, "REFUNDED");
+    }
+
+    // Refund payment after an approved return
+    @Override
+    @Transactional
+    public Payment refundForReturn(Long paymentId) {
+
+        Payment payment = getPaymentById(paymentId);
+
+        if (!"SUCCESS".equals(payment.getPaymentStatus())) {
+            throw new RuntimeException(
+                    "Only successful payments can be refunded for a return");
+        }
+
+        CustomerOrder order = payment.getOrder();
+
+        if (!"DELIVERED".equals(order.getStatus())) {
+            throw new RuntimeException(
+                    "Only delivered orders can be returned");
+        }
+
+        // Mark order as RETURNED and restore product stock
+        customerOrderService.completeReturn(order.getId());
+
+        // Update payment status
+        payment.setPaymentStatus("REFUNDED");
+
+        return paymentRepository.save(payment);
     }
 
     @Override

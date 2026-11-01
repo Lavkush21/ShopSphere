@@ -1,4 +1,3 @@
-
 package com.shopsphere.service;
 
 import java.util.List;
@@ -20,6 +19,9 @@ public interface PaymentService {
     Payment updatePaymentStatus(Long id, String status);
 
     Payment refundPayment(Long id);
+
+    // Refund payment after an approved return
+    Payment refundForReturn(Long paymentId);
 
     void deletePayment(Long id);
 }
