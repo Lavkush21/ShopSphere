@@ -1,3 +1,4 @@
+
 package com.shopsphere.service.impl;
 
 import java.util.List;
@@ -5,6 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.shopsphere.entity.Coupon;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CouponRepository;
 import com.shopsphere.service.CouponService;
 
@@ -41,13 +43,15 @@ public class CouponServiceImpl implements CouponService {
     @Override
     public Coupon getCouponById(Long id) {
         return couponRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Coupon not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Coupon not found with ID: " + id));
     }
 
     @Override
     public Coupon getCouponByCode(String code) {
         return couponRepository.findByCodeIgnoreCase(code)
-                .orElseThrow(() -> new RuntimeException("Coupon not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Coupon not found with code: " + code));
     }
 
     @Override
@@ -76,7 +80,8 @@ public class CouponServiceImpl implements CouponService {
 
         if (coupon.getDiscountValue() == null
                 || coupon.getDiscountValue() <= 0) {
-            throw new RuntimeException("Discount value must be greater than zero");
+            throw new RuntimeException(
+                    "Discount value must be greater than zero");
         }
 
         if (coupon.getDiscountType() == null) {
@@ -86,15 +91,18 @@ public class CouponServiceImpl implements CouponService {
         String type = coupon.getDiscountType().toUpperCase();
 
         if (!type.equals("PERCENTAGE") && !type.equals("FIXED")) {
-            throw new RuntimeException("Discount type must be PERCENTAGE or FIXED");
+            throw new RuntimeException(
+                    "Discount type must be PERCENTAGE or FIXED");
         }
 
         if (type.equals("PERCENTAGE") && coupon.getDiscountValue() > 100) {
-            throw new RuntimeException("Percentage discount cannot exceed 100");
+            throw new RuntimeException(
+                    "Percentage discount cannot exceed 100");
         }
 
         if (coupon.getUsageLimit() != null && coupon.getUsageLimit() <= 0) {
-            throw new RuntimeException("Usage limit must be greater than zero");
+            throw new RuntimeException(
+                    "Usage limit must be greater than zero");
         }
     }
 }

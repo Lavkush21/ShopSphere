@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.shopsphere.entity.Product;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.ProductRepository;
 import com.shopsphere.service.ProductService;
 
@@ -34,7 +35,8 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public Product getProductById(Long id) {
         return productRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Product not found with ID: " + id));
     }
 
     @Override
@@ -77,18 +79,19 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findByPriceBetween(minPrice, maxPrice, pageable);
     }
 
-    // Sort products by price or name
     @Override
     public Page<Product> sortProducts(
             String sortBy, String direction, int page, int size) {
 
         if (!sortBy.equals("price") && !sortBy.equals("name")) {
-            throw new IllegalArgumentException("Sort by must be price or name");
+            throw new IllegalArgumentException(
+                    "Sort by must be price or name");
         }
 
         if (!direction.equalsIgnoreCase("asc")
                 && !direction.equalsIgnoreCase("desc")) {
-            throw new IllegalArgumentException("Direction must be asc or desc");
+            throw new IllegalArgumentException(
+                    "Direction must be asc or desc");
         }
 
         Sort sort = direction.equalsIgnoreCase("asc")

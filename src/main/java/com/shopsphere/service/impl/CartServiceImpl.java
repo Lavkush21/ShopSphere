@@ -1,4 +1,3 @@
-
 package com.shopsphere.service.impl;
 
 import java.util.List;
@@ -9,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.shopsphere.entity.Cart;
 import com.shopsphere.entity.CartItem;
 import com.shopsphere.entity.Product;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CartItemRepository;
 import com.shopsphere.repository.CartRepository;
 import com.shopsphere.repository.CustomerRepository;
@@ -44,10 +44,12 @@ public class CartServiceImpl implements CartService {
         }
 
         customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
 
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Product not found with ID: " + productId));
 
         if (product.getStock() < quantity) {
             throw new RuntimeException("Insufficient stock available");
@@ -87,7 +89,8 @@ public class CartServiceImpl implements CartService {
     public List<CartItem> getCartItems(Long customerId) {
 
         Cart cart = cartRepository.findByCustomerId(customerId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cart not found for Customer ID: " + customerId));
 
         return cartItemRepository.findByCart_Id(cart.getId());
     }
@@ -101,11 +104,13 @@ public class CartServiceImpl implements CartService {
         }
 
         Cart cart = cartRepository.findByCustomerId(customerId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cart not found for Customer ID: " + customerId));
 
         CartItem item = cartItemRepository
                 .findByCart_IdAndProduct_Id(cart.getId(), productId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cart item not found for Product ID: " + productId));
 
         Product product = item.getProduct();
 
@@ -124,11 +129,13 @@ public class CartServiceImpl implements CartService {
     public void removeCartItem(Long customerId, Long productId) {
 
         Cart cart = cartRepository.findByCustomerId(customerId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cart not found for Customer ID: " + customerId));
 
         CartItem item = cartItemRepository
                 .findByCart_IdAndProduct_Id(cart.getId(), productId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cart item not found for Product ID: " + productId));
 
         cartItemRepository.delete(item);
     }
@@ -138,7 +145,8 @@ public class CartServiceImpl implements CartService {
     public void clearCart(Long customerId) {
 
         Cart cart = cartRepository.findByCustomerId(customerId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Cart not found for Customer ID: " + customerId));
 
         cartItemRepository.deleteByCart_Id(cart.getId());
     }

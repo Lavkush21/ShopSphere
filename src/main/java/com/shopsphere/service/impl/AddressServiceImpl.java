@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.shopsphere.entity.Address;
 import com.shopsphere.entity.Customer;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.AddressRepository;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.service.AddressService;
@@ -27,7 +28,8 @@ public class AddressServiceImpl implements AddressService {
     public Address addAddress(Long customerId, Address address) {
 
         Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
 
         address.setCustomer(customer);
 
@@ -38,7 +40,8 @@ public class AddressServiceImpl implements AddressService {
     public List<Address> getAddressesByCustomerId(Long customerId) {
 
         if (!customerRepository.existsById(customerId)) {
-            throw new RuntimeException("Customer not found");
+            throw new ResourceNotFoundException(
+                    "Customer not found with ID: " + customerId);
         }
 
         return addressRepository.findByCustomer_Id(customerId);
@@ -48,7 +51,8 @@ public class AddressServiceImpl implements AddressService {
     public Address updateAddress(Long addressId, Address updatedAddress) {
 
         Address address = addressRepository.findById(addressId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Address not found with ID: " + addressId));
 
         address.setAddressLine(updatedAddress.getAddressLine());
         address.setCity(updatedAddress.getCity());
@@ -63,7 +67,8 @@ public class AddressServiceImpl implements AddressService {
     public void deleteAddress(Long addressId) {
 
         Address address = addressRepository.findById(addressId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Address not found with ID: " + addressId));
 
         addressRepository.delete(address);
     }

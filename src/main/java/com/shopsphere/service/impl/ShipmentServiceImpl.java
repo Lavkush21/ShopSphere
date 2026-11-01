@@ -1,4 +1,3 @@
-
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
@@ -9,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.Shipment;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.ShipmentRepository;
 import com.shopsphere.service.CustomerOrderService;
@@ -41,7 +41,8 @@ public class ShipmentServiceImpl implements ShipmentService {
                                    String courierName) {
 
         CustomerOrder order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Order not found with ID: " + orderId));
 
         if (shipmentRepository.existsByOrder_Id(orderId)) {
             throw new RuntimeException(
@@ -84,21 +85,25 @@ public class ShipmentServiceImpl implements ShipmentService {
     @Transactional(readOnly = true)
     public Shipment getShipmentById(Long id) {
         return shipmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Shipment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Shipment not found with ID: " + id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Shipment getShipmentByOrderId(Long orderId) {
         return shipmentRepository.findByOrder_Id(orderId)
-                .orElseThrow(() -> new RuntimeException("Shipment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Shipment not found for Order ID: " + orderId));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Shipment getShipmentByTrackingNumber(String trackingNumber) {
         return shipmentRepository.findByTrackingNumber(trackingNumber)
-                .orElseThrow(() -> new RuntimeException("Shipment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Shipment not found with tracking number: "
+                                + trackingNumber));
     }
 
     @Override
@@ -128,7 +133,6 @@ public class ShipmentServiceImpl implements ShipmentService {
 
         CustomerOrder order = shipment.getOrder();
 
-        // Update order status when shipment is shipped
         if ("SHIPPED".equals(newStatus)
                 && !"SHIPPED".equals(currentStatus)) {
 
@@ -152,7 +156,6 @@ public class ShipmentServiceImpl implements ShipmentService {
             }
         }
 
-        // Update order status when shipment is delivered
         if ("DELIVERED".equals(newStatus)) {
 
             customerOrderService.updateOrderStatus(

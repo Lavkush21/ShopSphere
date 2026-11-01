@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.shopsphere.entity.Customer;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.service.CustomerService;
 
@@ -35,7 +36,8 @@ public class CustomerServiceImpl implements CustomerService {
     @Override
     public Customer getCustomerById(Long id) {
         return customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + id));
     }
 
     @Override

@@ -1,3 +1,4 @@
+
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.Payment;
 import com.shopsphere.entity.ReturnRequest;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.ReturnRequestRepository;
 import com.shopsphere.service.PaymentService;
@@ -37,7 +39,8 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
     public ReturnRequest createReturnRequest(Long orderId, String reason) {
 
         CustomerOrder order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Order not found with ID: " + orderId));
 
         if (!"DELIVERED".equalsIgnoreCase(order.getStatus())) {
             throw new RuntimeException(
@@ -71,8 +74,8 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
     @Transactional(readOnly = true)
     public ReturnRequest getReturnRequestById(Long id) {
         return returnRequestRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException(
-                        "Return request not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Return request not found with ID: " + id));
     }
 
     @Override
@@ -80,7 +83,8 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
     public List<ReturnRequest> getReturnRequestsByOrderId(Long orderId) {
 
         if (!orderRepository.existsById(orderId)) {
-            throw new RuntimeException("Order not found");
+            throw new ResourceNotFoundException(
+                    "Order not found with ID: " + orderId);
         }
 
         return returnRequestRepository.findByOrder_Id(orderId);
@@ -119,11 +123,9 @@ public class ReturnRequestServiceImpl implements ReturnRequestService {
 
             CustomerOrder order = request.getOrder();
 
-            // Find payment associated with this order
             Payment payment = paymentService.getPaymentByOrderId(
                     order.getId());
 
-            // Refund payment and restore product stock
             paymentService.refundForReturn(payment.getId());
 
             request.setCompletedDate(LocalDateTime.now());

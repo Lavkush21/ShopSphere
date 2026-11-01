@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.Product;
 import com.shopsphere.entity.ProductReview;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.repository.ProductRepository;
 import com.shopsphere.repository.ProductReviewRepository;
@@ -35,14 +36,17 @@ public class ProductReviewServiceImpl implements ProductReviewService {
             Long customerId, Long productId, ProductReview review) {
 
         Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
 
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Product not found with ID: " + productId));
 
         if (reviewRepository.existsByCustomer_IdAndProduct_Id(
                 customerId, productId)) {
-            throw new RuntimeException("You have already reviewed this product");
+            throw new RuntimeException(
+                    "You have already reviewed this product");
         }
 
         if (review.getRating() == null
@@ -61,7 +65,8 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     public List<ProductReview> getReviewsByProductId(Long productId) {
 
         productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Product not found with ID: " + productId));
 
         return reviewRepository.findByProduct_Id(productId);
     }
@@ -70,7 +75,8 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     public List<ProductReview> getReviewsByCustomerId(Long customerId) {
 
         customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
 
         return reviewRepository.findByCustomer_Id(customerId);
     }
@@ -80,7 +86,8 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     public ProductReview updateReview(Long reviewId, ProductReview review) {
 
         ProductReview existingReview = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new RuntimeException("Review not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Review not found with ID: " + reviewId));
 
         if (review.getRating() == null
                 || review.getRating() < 1
@@ -98,7 +105,8 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     public void deleteReview(Long reviewId) {
 
         ProductReview review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new RuntimeException("Review not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Review not found with ID: " + reviewId));
 
         reviewRepository.delete(review);
     }

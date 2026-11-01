@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.shopsphere.entity.Category;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CategoryRepository;
 import com.shopsphere.service.CategoryService;
 
@@ -39,7 +40,8 @@ public class CategoryServiceImpl implements CategoryService {
     public Category getCategoryById(Long id) {
 
         return categoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Category not found with ID: " + id));
     }
 
     // Update Category

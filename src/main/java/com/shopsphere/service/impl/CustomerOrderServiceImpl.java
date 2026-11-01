@@ -1,4 +1,3 @@
-
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
@@ -12,6 +11,7 @@ import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.OrderItem;
 import com.shopsphere.entity.OrderStatusHistory;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.repository.OrderStatusHistoryRepository;
@@ -55,7 +55,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     public CustomerOrder createOrder(CustomerOrder order, Long customerId) {
 
         Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
 
         order.setCustomer(customer);
         order.setOrderDate(LocalDateTime.now());
@@ -72,7 +73,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                     savedOrder.getTotalAmount()
             );
         } catch (Exception e) {
-            System.err.println("Order confirmation email failed: " + e.getMessage());
+            System.err.println(
+                    "Order confirmation email failed: " + e.getMessage());
         }
 
         return savedOrder;
@@ -86,7 +88,8 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     @Override
     public CustomerOrder getOrderById(Long id) {
         return orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Order not found with ID: " + id));
     }
 
     @Override
@@ -127,21 +130,18 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         if ("CANCELLED".equals(previousStatus)
                 || "RETURNED".equals(previousStatus)) {
             throw new RuntimeException(
-                    "Cancelled or returned order cannot be updated"
-            );
+                    "Cancelled or returned order cannot be updated");
         }
 
         if ("RETURNED".equals(newStatus)) {
             throw new RuntimeException(
-                    "Order can be marked RETURNED only through return completion"
-            );
+                    "Order can be marked RETURNED only through return completion");
         }
 
         if (!isValidTransition(previousStatus, newStatus)) {
             throw new RuntimeException(
                     "Invalid order status transition: "
-                    + previousStatus + " to " + newStatus
-            );
+                    + previousStatus + " to " + newStatus);
         }
 
         order.setStatus(newStatus);
@@ -161,7 +161,6 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     private boolean isValidTransition(String currentStatus, String newStatus) {
 
         switch (currentStatus) {
-
             case "PENDING":
                 return "CONFIRMED".equals(newStatus);
 
@@ -192,8 +191,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
         if (!"PENDING".equals(order.getStatus())
                 && !"CONFIRMED".equals(order.getStatus())) {
             throw new RuntimeException(
-                    "Only pending or confirmed orders can be cancelled"
-            );
+                    "Only pending or confirmed orders can be cancelled");
         }
 
         String previousStatus = order.getStatus();
@@ -222,8 +220,7 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
 
         if (!"DELIVERED".equals(order.getStatus())) {
             throw new RuntimeException(
-                    "Only delivered orders can be returned"
-            );
+                    "Only delivered orders can be returned");
         }
 
         String previousStatus = order.getStatus();

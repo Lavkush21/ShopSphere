@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.shopsphere.entity.Customer;
 import com.shopsphere.entity.Notification;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CustomerRepository;
 import com.shopsphere.repository.NotificationRepository;
 import com.shopsphere.service.NotificationService;
@@ -39,7 +40,8 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
 
         Notification notification = new Notification();
         notification.setCustomer(customer);
@@ -58,12 +60,20 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public List<Notification> getNotificationsByCustomerId(Long customerId) {
 
+        customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
+
         return notificationRepository
                 .findByCustomer_IdOrderByCreatedAtDesc(customerId);
     }
 
     @Override
     public List<Notification> getUnreadNotifications(Long customerId) {
+
+        customerRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer not found with ID: " + customerId));
 
         return notificationRepository
                 .findByCustomer_IdAndReadFalseOrderByCreatedAtDesc(customerId);
@@ -74,7 +84,8 @@ public class NotificationServiceImpl implements NotificationService {
     public Notification markAsRead(Long notificationId) {
 
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Notification not found with ID: " + notificationId));
 
         notification.setRead(true);
 
@@ -85,7 +96,8 @@ public class NotificationServiceImpl implements NotificationService {
     public void deleteNotification(Long notificationId) {
 
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Notification not found with ID: " + notificationId));
 
         notificationRepository.delete(notification);
     }

@@ -1,4 +1,3 @@
-
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
@@ -10,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.shopsphere.entity.CustomerOrder;
 import com.shopsphere.entity.Payment;
+import com.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.PaymentRepository;
 import com.shopsphere.service.CustomerOrderService;
@@ -45,7 +45,8 @@ public class PaymentServiceImpl implements PaymentService {
     public Payment createPayment(Long orderId, Payment payment) {
 
         CustomerOrder order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Order not found with ID: " + orderId));
 
         if (paymentRepository.existsByOrder_Id(orderId)) {
             throw new RuntimeException(
@@ -83,15 +84,16 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional(readOnly = true)
     public Payment getPaymentById(Long id) {
         return paymentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Payment not found with ID: " + id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Payment getPaymentByOrderId(Long orderId) {
         return paymentRepository.findByOrder_Id(orderId)
-                .orElseThrow(() -> new RuntimeException(
-                        "Payment not found for this order"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Payment not found for Order ID: " + orderId));
     }
 
     @Override
@@ -135,7 +137,6 @@ public class PaymentServiceImpl implements PaymentService {
                         "Payment amount must match order total");
             }
 
-            // Update order status and automatically save status history
             customerOrderService.updateOrderStatus(
                     order.getId(), "CONFIRMED");
         }
@@ -189,7 +190,6 @@ public class PaymentServiceImpl implements PaymentService {
         return updatePaymentStatus(id, "REFUNDED");
     }
 
-    // Refund payment after an approved return
     @Override
     public Payment refundForReturn(Long paymentId) {
 
@@ -207,10 +207,8 @@ public class PaymentServiceImpl implements PaymentService {
                     "Only delivered orders can be returned");
         }
 
-        // Mark order as RETURNED and restore product stock
         customerOrderService.completeReturn(order.getId());
 
-        // Update payment status
         payment.setPaymentStatus("REFUNDED");
 
         return paymentRepository.save(payment);
