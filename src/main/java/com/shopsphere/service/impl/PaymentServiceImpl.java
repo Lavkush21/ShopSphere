@@ -13,6 +13,7 @@ import com.shopsphere.entity.Payment;
 import com.shopsphere.repository.CustomerOrderRepository;
 import com.shopsphere.repository.PaymentRepository;
 import com.shopsphere.service.CustomerOrderService;
+import com.shopsphere.service.OrderEmailNotificationService;
 import com.shopsphere.service.PaymentService;
 
 @Service
@@ -25,15 +26,18 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final CustomerOrderRepository orderRepository;
     private final CustomerOrderService customerOrderService;
+    private final OrderEmailNotificationService orderEmailNotificationService;
 
     public PaymentServiceImpl(
             PaymentRepository paymentRepository,
             CustomerOrderRepository orderRepository,
-            CustomerOrderService customerOrderService) {
+            CustomerOrderService customerOrderService,
+            OrderEmailNotificationService orderEmailNotificationService) {
 
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.customerOrderService = customerOrderService;
+        this.orderEmailNotificationService = orderEmailNotificationService;
     }
 
     @Override
@@ -149,7 +153,23 @@ public class PaymentServiceImpl implements PaymentService {
 
         payment.setPaymentStatus(newStatus);
 
-        return paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+
+        // Send Payment Success Email
+        if ("SUCCESS".equals(newStatus)) {
+            try {
+                orderEmailNotificationService.sendPaymentSuccess(
+                        order.getCustomer().getEmail(),
+                        order.getId(),
+                        payment.getAmount()
+                );
+            } catch (Exception e) {
+                System.err.println(
+                        "Payment success email failed: " + e.getMessage());
+            }
+        }
+
+        return savedPayment;
     }
 
     @Override

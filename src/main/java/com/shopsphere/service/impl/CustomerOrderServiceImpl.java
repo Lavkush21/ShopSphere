@@ -1,3 +1,4 @@
+
 package com.shopsphere.service.impl;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import com.shopsphere.repository.OrderStatusHistoryRepository;
 import com.shopsphere.repository.ProductRepository;
 
 import com.shopsphere.service.CustomerOrderService;
+import com.shopsphere.service.OrderEmailNotificationService;
 
 @Service
 public class CustomerOrderServiceImpl implements CustomerOrderService {
@@ -35,17 +37,20 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
     private final CustomerRepository customerRepository;
     private final ProductRepository productRepository;
     private final OrderStatusHistoryRepository historyRepository;
+    private final OrderEmailNotificationService orderEmailNotificationService;
 
     public CustomerOrderServiceImpl(
             CustomerOrderRepository orderRepository,
             CustomerRepository customerRepository,
             ProductRepository productRepository,
-            OrderStatusHistoryRepository historyRepository) {
+            OrderStatusHistoryRepository historyRepository,
+            OrderEmailNotificationService orderEmailNotificationService) {
 
         this.orderRepository = orderRepository;
         this.customerRepository = customerRepository;
         this.productRepository = productRepository;
         this.historyRepository = historyRepository;
+        this.orderEmailNotificationService = orderEmailNotificationService;
     }
 
     // Create Order
@@ -67,6 +72,17 @@ public class CustomerOrderServiceImpl implements CustomerOrderService {
                 "PENDING",
                 "Order created"
         );
+
+        // Send Order Confirmation Email
+        try {
+            orderEmailNotificationService.sendOrderConfirmation(
+                    customer.getEmail(),
+                    savedOrder.getId(),
+                    savedOrder.getTotalAmount()
+            );
+        } catch (Exception e) {
+            System.err.println("Order confirmation email failed: " + e.getMessage());
+        }
 
         return savedOrder;
     }
